@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"math"
 	"math/rand"
 	"os"
 	"strconv"
@@ -31,14 +30,27 @@ var optiall = false
 var justgenartis = false
 var artisonly = false
 var artis []Artifact
+var wantdb []Want
 
 func main() {
 	flag.IntVar(&simspertest, "i", 10000, "sim iterations per test")
 	flag.Parse()
 
 	readArtifacts()
-	calcRV()
+	readWant()
+	evalartis()
 	printResults()
+}
+
+func readWant() {
+
+}
+
+type Want struct {
+	Set       []string
+	Substats  []float64
+	Char      string
+	Mainstats [][]float64
 }
 
 type Artifact struct {
@@ -71,17 +83,36 @@ func getSetID(dom string) int { //returns the internal id for an artifact
 	return id
 }
 
-func printResults(res, base result) {
-	info := res.info + ":"
-	dps := "DPS: " + fmt.Sprintf("%.0f", res.DPS)
-	if res.resin == -1 {
-		fmt.Printf("%-40v%-30v\n", info, dps)
-		return
+func printResults() {
+	for _, a := range artis {
+		name := artiname(a) + ":"
+		on := "On: " + fmt.Sprintf("%.0f", a.RVon) + "%% for " + getchar(a.BestOn)
+		off := "Off: " + fmt.Sprintf("%.0f", a.RVoff) + "%% for " + getchar(a.BestOff)
+		fmt.Printf("%-40v%-40v%-40v\n", name, on, off)
 	}
-	dps += " (+" + fmt.Sprintf("%.0f", res.DPS-base.DPS) + ")"
-	resin := "Resin: " + fmt.Sprintf("%.0f", res.resin)
-	dpsresin := "DPS/Resin: " + fmt.Sprintf("%.2f", math.Max((res.DPS-base.DPS)/res.resin, 0.0))
-	fmt.Printf("%-40v%-30v%-30v%-24v\n", info, dps, resin, dpsresin)
+}
+
+func artiname(a Artifact) string {
+	name := a.Set
+	name += "+" + strconv.Itoa(a.Level) + slotkey[a.Slot][:1]
+	if a.Slot >= 2 {
+		name += meStats[a.Mainstat]
+	}
+	name += "-"
+	first := true
+	for i, s := range a.Substats {
+		if s > 0 {
+			if !first {
+				name += ","
+			} else {
+				first = false
+			}
+			name += strings.Replace(meStats[i], "f", "", 1) + fmt.Sprintf("%0.1f", s*float64(ispct[i]))
+			if ispct[i] == 100 {
+				name += "%"
+			}
+		}
+	}
 }
 
 type subrolls struct {
@@ -140,10 +171,82 @@ func readArtifacts() {
 			if s.Key == "" {
 				break
 			}
-
+			art.Substats[getStatID(s.Key)] += s.Value / float64(ispct[getStatID(s.Key)])
 		}
 		artis = append(artis, art)
 	}
+}
+
+func evalartis() {
+	for i, w := range wantdb {
+		for _, a := range artis {
+			rv := maxrv(a, w) + currv(a, w)
+			on := isOn(a, w)
+			if on {
+				if rv > a.RVon {
+					a.RVon = rv
+					a.BestOn = i
+				}
+			} else {
+				if rv > a.RVoff {
+					a.RVoff = rv
+					a.BestOff = i
+				}
+			}
+		}
+	}
+}
+
+func isOn(a Artifact, w Want) bool {
+	for _, s := range w.Set {
+		if s == a.Set {
+			return true
+		}
+	}
+	return false
+}
+
+func maxrv(a Artifact, w Want) int {
+	ptrolls := 5 - a.Level/4
+	rv := currv(a, w)
+	if a.Lines == 3 {
+		ptrolls--
+		//choose the best stat not currently on arti
+		w2 := w.Substats
+		for i := range a.Substats {
+			if a.Substats[i] > 0 {
+				w2[i] = 0
+			}
+		}
+		rv += int(100.0 * maxsub(w2))
+	}
+	w2 := w.Substats
+	if a.Lines == 4 { //if 4 lines, best stat to upgrade might not be the BIS one
+		for i := range a.Substats {
+			if a.Substats[i] == 0 {
+				w2[i] = 0
+			}
+		}
+	}
+	return rv + ptrolls*int(100.0*maxsub(w2))
+}
+
+func currv(a Artifact, w Want) int {
+	rv := 0
+	for i := range a.Substats {
+		rv += int(a.Substats[i] / maxrolls[i] * w.Substats[i] * 100.0)
+	}
+	return rv
+}
+
+func maxsub(subs []float64) float64 {
+	max := -1.0
+	for _, s := range subs {
+		if s > max {
+			max = s
+		}
+	}
+	return max
 }
 
 func getAGsubs(raw, file string) []float64 {
@@ -240,6 +343,7 @@ var GOchars = []string{"Ganyu", "Rosaria", "SangonomiyaKokomi", "Venti", "Kamisa
 
 var slotKey = []string{"flower", "plume", "sands", "goblet", "circlet"}
 var statKey = []string{"atk", "atk_", "hp", "hp_", "def", "def_", "eleMas", "enerRech_", "critRate_", "critDMG_", "heal_", "pyro_dmg_", "electro_dmg_", "cryo_dmg_", "hydro_dmg_", "anemo_dmg_", "geo_dmg_", "physical_dmg_"}
+var meStats = []string{"atkf", "atk", "hpf", "hp", "deff", "def", "em", "er", "cr", "cd", "heal", "pyro", "electro", "cryo", "hydro", "anemo", "geo", "phys"}
 var AGstatKeys = []string{"Atk", "n/a", "hp", "n/a", "Def", "n/a", "ele_mas", "EnergyRecharge", "CritRate", "CritDMG", "HealingBonus", "pyro", "electro", "cryo", "hydro", "anemo", "geo", "physicalDmgBonus"}
 var msv = []float64{311.0, 0.466, 4780, 0.466, -1, 0.583, 187, 0.518, 0.311, 0.622, 0.359, 0.466, 0.466, 0.466, 0.466, 0.466, 0.466, 0.583} //def% heal and phys might be wrong
 var ispct = []int{1, 100, 1, 100, 1, 100, 1, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100}
@@ -291,7 +395,7 @@ func randomGOarti(domain int) string {
 	return arti
 }
 
-var standards = []float64{16.54, 0.0496, 253.94, 0.0496, 19.68, 0.062, 19.82, 0.0551, 0.0331, 0.0662}
+var maxrolls = []float64{19.45, 0.0583, 298.75, 0.0583, 23.15, 0.0729, 23.31, 0.0648, 0.0389, 0.0777, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0}
 
 func torolls(subs []float64) string {
 	str := "atk=" + fmt.Sprintf("%f", subs[0])
