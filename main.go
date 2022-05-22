@@ -17,18 +17,7 @@ var artifarmsims = 30  //default: -1, which will be 100000/artifarmtime. set it 
 var domains []string
 var simspertest = 100000      //iterations to run gcsim at when testing dps gain from upgrades.
 var godatafile = "GOdata.txt" //filename of the GO data that will be used for weapons, current artifacts, and optimization settings besides ER. When go adds ability to optimize for x*output1 + y*output2, the reference sim will be used to determine optimization target.
-var good string
-var domstring = ""
-var optiorder = []string{"ph0", "ph1", "ph2", "ph3"} //the order in which to optimize the characters
-var manualOverride = []string{"", "", "", ""}
-var optifor = []string{"", "", "", ""} //chars to not optimize artis for
-var team = []string{"", "", "", ""}
-var dbconfig = ""
-var mode6 = 6
-var mode85 = false
-var optiall = false
-var justgenartis = false
-var artisonly = false
+var wantfile = "arti.csv"
 var artis []Artifact
 var wantdb []Want
 
@@ -44,6 +33,39 @@ func main() {
 
 func readWant() {
 
+	f, err := os.ReadFile(godatafile)
+	if err != nil {
+		fmt.Printf("%v", err)
+	}
+	rawwant := string(f)
+	wants := strings.Split(rawwant, "\n")
+	for i := range wants {
+		data := strings.Split(wants[i], ",")
+		var w Want
+		w.Char = data[0]
+		sets := strings.Split(data[1], " ")
+		w.Set = []string{sets[0]}
+		for j := range sets {
+			if j != 0 {
+				w.Set = append(w.Set, sets[j])
+			}
+		}
+		w.Mainstats = [][]float64{makestats("hpf", 1.0), makestats("atkf", 1.0), makestats(data[2], 1.0), makestats(data[3], 1.0), makestats(data[4], 1.0)}
+		w.Substats = addsubs(newsubs(), makestats(data[5], 1.0))
+		w.Substats = addsubs(w.Substats, makestats(data[6], 0.5))
+	}
+}
+
+func makestats(stats string, val float64) []float64 {
+	s := newsubs()
+	if stats == "" {
+		return s
+	}
+	sssss := strings.Split(stats, " ")
+	for i := range sssss {
+		s[getMeStat(sssss[i])] = val
+	}
+	return s
 }
 
 type Want struct {
@@ -86,15 +108,15 @@ func getSetID(dom string) int { //returns the internal id for an artifact
 func printResults() {
 	for _, a := range artis {
 		name := artiname(a) + ":"
-		on := "On: " + fmt.Sprintf("%.0f", a.RVon) + "%% for " + getchar(a.BestOn)
-		off := "Off: " + fmt.Sprintf("%.0f", a.RVoff) + "%% for " + getchar(a.BestOff)
+		on := "On: " + fmt.Sprintf("%.0f", a.RVon) + "%% for " + wantdb[a.BestOn].Char
+		off := "Off: " + fmt.Sprintf("%.0f", a.RVoff) + "%% for " + wantdb[a.BestOff].Char
 		fmt.Printf("%-40v%-40v%-40v\n", name, on, off)
 	}
 }
 
 func artiname(a Artifact) string {
 	name := a.Set
-	name += "+" + strconv.Itoa(a.Level) + slotkey[a.Slot][:1]
+	name += "+" + strconv.Itoa(a.Level) + slotKey[a.Slot][:1]
 	if a.Slot >= 2 {
 		name += meStats[a.Mainstat]
 	}
@@ -113,6 +135,7 @@ func artiname(a Artifact) string {
 			}
 		}
 	}
+	return name
 }
 
 type subrolls struct {
@@ -167,11 +190,12 @@ func readArtifacts() {
 		art.BestOff = -1
 		art.RVon = -1
 		art.RVoff = -1
-		for j, s := range gartis[i].Substats {
+		for _, s := range gartis[i].Substats {
 			if s.Key == "" {
 				break
 			}
 			art.Substats[getStatID(s.Key)] += s.Value / float64(ispct[getStatID(s.Key)])
+			art.Lines++
 		}
 		artis = append(artis, art)
 	}
@@ -208,7 +232,7 @@ func isOn(a Artifact, w Want) bool {
 
 func maxrv(a Artifact, w Want) int {
 	ptrolls := 5 - a.Level/4
-	rv := currv(a, w)
+	rv := 0
 	if a.Lines == 3 {
 		ptrolls--
 		//choose the best stat not currently on arti
@@ -228,7 +252,8 @@ func maxrv(a Artifact, w Want) int {
 			}
 		}
 	}
-	return rv + ptrolls*int(100.0*maxsub(w2))
+	rv += ptrolls * int(100.0*maxsub(w2))
+	return int(float64(rv)*w.Mainstats[a.Slot][a.Mainstat]) + currv(a, w)
 }
 
 func currv(a Artifact, w Want) int {
@@ -236,7 +261,7 @@ func currv(a Artifact, w Want) int {
 	for i := range a.Substats {
 		rv += int(a.Substats[i] / maxrolls[i] * w.Substats[i] * 100.0)
 	}
-	return rv
+	return int(float64(rv) * w.Mainstats[a.Slot][a.Mainstat])
 }
 
 func maxsub(subs []float64) float64 {
@@ -247,39 +272,6 @@ func maxsub(subs []float64) float64 {
 		}
 	}
 	return max
-}
-
-func getAGsubs(raw, file string) []float64 {
-	subs := newsubs()
-	//fmt.Printf("%v", raw)
-	artis := strings.Split(raw, "|")
-	for _, a := range artis {
-		if a == "" {
-			continue
-		}
-		asubs := newsubs()
-		stats := strings.Split(a, "~")
-		for _, s := range stats {
-			if s == "" {
-				continue
-			}
-			stattype := s[:strings.Index(s, "=")]
-			val := s[strings.Index(s, "=")+1:]
-			ispt := false
-			if strings.Contains(val, "%") {
-				val = val[:len(val)-1]
-				ispt = true
-			}
-			parse, err := strconv.ParseFloat(val, 64)
-			if err != nil {
-				fmt.Printf("%v", err)
-			}
-			asubs[AGstatid(stattype, ispt)] += parse
-		}
-		deleteArtis(file, asubs) //delete the artis chosen so that they're not selected again for another char
-		subs = addsubs(subs, asubs)
-	}
-	return subs
 }
 
 func newsubs() []float64 { //empty stat array
@@ -306,6 +298,16 @@ func getStatID(key string) int {
 		}
 	}
 	fmt.Printf("%v not recognized as a key", key)
+	return -1
+}
+
+func getMeStat(key string) int {
+	for i, k := range meStats {
+		if k == key {
+			return i
+		}
+	}
+	fmt.Printf("%v not recognized as a mestat", key)
 	return -1
 }
 
@@ -445,19 +447,6 @@ func multsubs(s []float64, mult float64) []float64 {
 
 var subchance = []int{6, 4, 6, 4, 6, 4, 4, 4, 3, 3}
 var srolls = []float64{0.824, 0.941, 1.059, 1.176}
-
-/*type subrolls struct {
-	Atk  float64
-	AtkP float64
-	HP   float64
-	HPP  float64
-	Def  float64
-	DefP float64
-	EM   float64
-	ER   float64
-	CR   float64
-	CD   float64
-}*/ //then: heal, pyro,electro,cryo,hydro,anemo,geo,phys
 
 var rollints = []int{1, 1, 30, 80, 50}
 var mschance = [][]int{ //chance of mainstat based on arti type
