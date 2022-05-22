@@ -4,17 +4,11 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 )
 
-var referencesim = "https://gcsim.app/viewer/share/BGznqjs62S9w8qxpxPu7w" //link to the gcsim that gives rotation, er reqs and optimization priority. actually no er reqs unless user wants, instead, let them use their er and set infinite energy.
-//var chars = make([]Character, 4);
-var artifarmtime = 126 //how long it should simulate farming artis, set as number of artifacts farmed. 20 resin ~= 1.07 artifacts.
-var artifarmsims = 30  //default: -1, which will be 100000/artifarmtime. set it to something else if desired. nvm 30 is fine lol
-var domains []string
 var simspertest = 100000      //iterations to run gcsim at when testing dps gain from upgrades.
 var godatafile = "GOdata.txt" //filename of the GO data that will be used for weapons, current artifacts, and optimization settings besides ER. When go adds ability to optimize for x*output1 + y*output2, the reference sim will be used to determine optimization target.
 var wantfile = "arti.csv"
@@ -33,7 +27,7 @@ func main() {
 
 func readWant() {
 
-	f, err := os.ReadFile(godatafile)
+	f, err := os.ReadFile(wantfile)
 	if err != nil {
 		fmt.Printf("%v", err)
 	}
@@ -136,19 +130,6 @@ func artiname(a Artifact) string {
 		}
 	}
 	return name
-}
-
-type subrolls struct {
-	Atk  float64
-	AtkP float64
-	HP   float64
-	HPP  float64
-	Def  float64
-	DefP float64
-	EM   float64
-	ER   float64
-	CR   float64
-	CD   float64
 }
 
 type GOarti struct {
@@ -347,79 +328,9 @@ var slotKey = []string{"flower", "plume", "sands", "goblet", "circlet"}
 var statKey = []string{"atk", "atk_", "hp", "hp_", "def", "def_", "eleMas", "enerRech_", "critRate_", "critDMG_", "heal_", "pyro_dmg_", "electro_dmg_", "cryo_dmg_", "hydro_dmg_", "anemo_dmg_", "geo_dmg_", "physical_dmg_"}
 var meStats = []string{"atkf", "atk", "hpf", "hp", "deff", "def", "em", "er", "cr", "cd", "heal", "pyro", "electro", "cryo", "hydro", "anemo", "geo", "phys"}
 var AGstatKeys = []string{"Atk", "n/a", "hp", "n/a", "Def", "n/a", "ele_mas", "EnergyRecharge", "CritRate", "CritDMG", "HealingBonus", "pyro", "electro", "cryo", "hydro", "anemo", "geo", "physicalDmgBonus"}
-var msv = []float64{311.0, 0.466, 4780, 0.466, -1, 0.583, 187, 0.518, 0.311, 0.622, 0.359, 0.466, 0.466, 0.466, 0.466, 0.466, 0.466, 0.583} //def% heal and phys might be wrong
 var ispct = []int{1, 100, 1, 100, 1, 100, 1, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100}
 
-func gcsimArtiName(abbr string) string {
-	for i, a := range artiabbrs {
-		if a == abbr {
-			return strings.ToLower(artinames[i])
-		}
-	}
-	fmt.Printf("arti abbreviation %v not recognized", abbr)
-	return ""
-}
-
-func randomGOarti(domain int) string {
-	arti := "{\"setKey\":\""
-	//if rand.Intn(2) == 0 {
-	//	arti += "MaidenBeloved"
-	//} else {
-	arti += artinames[domain+rand.Intn(2)]
-	//}
-	arti += "\",\"rarity\":5,\"level\":20,\"slotKey\":\""
-	artistats := randomarti()
-	arti += slotKey[int(artistats[10])]
-	arti += "\",\"mainStatKey\":\""
-	arti += statKey[int(artistats[11])]
-	arti += "\",\"substats\":["
-	curpos := 0
-	found := 0
-	for found < 4 {
-		if artistats[curpos] > 0 {
-			arti += "{\"key\":\""
-			arti += statKey[curpos]
-			arti += "\",\"value\":"
-			if ispct[curpos] == 1 {
-				arti += fmt.Sprintf("%.0f", standards[curpos]*artistats[curpos])
-			} else {
-				arti += fmt.Sprintf("%.1f", 100.0*standards[curpos]*artistats[curpos])
-			}
-			arti += "}"
-			if found < 3 {
-				arti += ","
-			}
-			found++
-		}
-		curpos++
-	}
-	arti += "],\"location\":\"\",\"exclude\":false,\"lock\":true},"
-	return arti
-}
-
 var maxrolls = []float64{19.45, 0.0583, 298.75, 0.0583, 23.15, 0.0729, 23.31, 0.0648, 0.0389, 0.0777, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0}
-
-func torolls(subs []float64) string {
-	str := "atk=" + fmt.Sprintf("%f", subs[0])
-	str += " atk%=" + fmt.Sprintf("%f", subs[1])
-	str += " hp=" + fmt.Sprintf("%f", subs[2])
-	str += " hp%=" + fmt.Sprintf("%f", subs[3])
-	str += " def=" + fmt.Sprintf("%f", subs[4])
-	str += " def%=" + fmt.Sprintf("%f", subs[5])
-	str += " em=" + fmt.Sprintf("%f", subs[6])
-	str += " er=" + fmt.Sprintf("%f", subs[7])
-	str += " cr=" + fmt.Sprintf("%f", subs[8])
-	str += " cd=" + fmt.Sprintf("%f", subs[9])
-	str += " heal=" + fmt.Sprintf("%f", subs[10])
-	str += " pyro%=" + fmt.Sprintf("%f", subs[11])
-	str += " electro%=" + fmt.Sprintf("%f", subs[12])
-	str += " cryo%=" + fmt.Sprintf("%f", subs[13])
-	str += " hydro%=" + fmt.Sprintf("%f", subs[14])
-	str += " anemo%=" + fmt.Sprintf("%f", subs[15])
-	str += " geo%=" + fmt.Sprintf("%f", subs[16])
-	str += " phys%=" + fmt.Sprintf("%f", subs[17])
-	return str
-}
 
 func addsubs(s1, s2 []float64) []float64 {
 	add := newsubs()
@@ -455,51 +366,4 @@ var mschance = [][]int{ //chance of mainstat based on arti type
 	{0, 8, 0, 8, 0, 8, 3, 3},
 	{0, 17, 0, 17, 0, 16, 2, 0, 0, 0, 0, 4, 4, 4, 4, 4, 4, 4},
 	{0, 11, 0, 11, 0, 11, 2, 0, 5, 5, 5},
-}
-
-func randomarti() []float64 {
-	arti := []float64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-	arti[10] = float64(rand.Intn(5)) //this is type, 0=flower, 1=feather, etc... all these type conversions can't be ideal, should do this a diff way
-	m := rand.Intn(rollints[int(arti[10])])
-	ttl := 0
-	for i := range mschance[int(arti[10])] {
-		ttl += mschance[int(arti[10])][i]
-		if m < ttl {
-			arti[11] = float64(i)
-			break
-		}
-	}
-
-	count := 0
-	for count < 4 {
-		s := rand.Intn(44)
-		ttl = 0
-		for i := range subchance {
-			ttl += subchance[i]
-			if s < ttl {
-				s = i
-				break
-			}
-		}
-		if arti[s] == 0 {
-			count++
-			arti[s] += srolls[rand.Intn(4)]
-		}
-	}
-
-	upgrades := 0
-	if rand.Float64() < 0.2 {
-		upgrades = -1
-	}
-	for upgrades < 4 {
-		s := rand.Intn(10)
-		if arti[s] != 0 {
-			upgrades++
-			arti[s] += srolls[rand.Intn(4)]
-		}
-	}
-
-	//arti[7] = 0 //no er allowed
-
-	return arti
 }
