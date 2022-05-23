@@ -2,22 +2,21 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
 
-var simspertest = 100000      //iterations to run gcsim at when testing dps gain from upgrades.
 var godatafile = "GOdata.txt" //filename of the GO data that will be used for weapons, current artifacts, and optimization settings besides ER. When go adds ability to optimize for x*output1 + y*output2, the reference sim will be used to determine optimization target.
 var wantfile = "arti.csv"
 var artis []Artifact
 var wantdb []Want
 
 func main() {
-	flag.IntVar(&simspertest, "i", 10000, "sim iterations per test")
-	flag.Parse()
+	//flag.IntVar(&simspertest, "i", 10000, "sim iterations per test")
+	//flag.Parse()
 
 	readArtifacts()
 	readWant()
@@ -35,8 +34,12 @@ func readWant() {
 	wants := strings.Split(rawwant, "\n")
 	for i := range wants {
 		data := strings.Split(wants[i], ",")
+		if len(data) <= 1 {
+			continue
+		}
 		var w Want
 		w.Char = data[0]
+		data[1] = strings.Replace(data[1], "2atk", "gf sr vh eof", -1)
 		sets := strings.Split(data[1], " ")
 		w.Set = []string{sets[0]}
 		for j := range sets {
@@ -44,9 +47,13 @@ func readWant() {
 				w.Set = append(w.Set, sets[j])
 			}
 		}
+		data[6] = strings.Replace(data[6], "\r", "", 1) //remove weird \r char
 		w.Mainstats = [][]float64{makestats("hpf", 1.0), makestats("atkf", 1.0), makestats(data[2], 1.0), makestats(data[3], 1.0), makestats(data[4], 1.0)}
 		w.Substats = addsubs(newsubs(), makestats(data[5], 1.0))
 		w.Substats = addsubs(w.Substats, makestats(data[6], 0.5))
+
+		//fmt.Printf("%v\n", w)
+		wantdb = append(wantdb, w)
 	}
 }
 
@@ -57,7 +64,12 @@ func makestats(stats string, val float64) []float64 {
 	}
 	sssss := strings.Split(stats, " ")
 	for i := range sssss {
-		s[getMeStat(sssss[i])] = val
+		if sssss[i] == "crit" {
+			s[getMeStat("cr")] = val
+			s[getMeStat("cd")] = val
+		} else {
+			s[getMeStat(sssss[i])] = val
+		}
 	}
 	return s
 }
@@ -100,17 +112,30 @@ func getSetID(dom string) int { //returns the internal id for an artifact
 }
 
 func printResults() {
+	sort.Sort(sortt(artis))
+
 	for _, a := range artis {
 		name := artiname(a) + ":"
-		on := "On: " + fmt.Sprintf("%.0f", a.RVon) + "%% for " + wantdb[a.BestOn].Char
-		off := "Off: " + fmt.Sprintf("%.0f", a.RVoff) + "%% for " + wantdb[a.BestOff].Char
-		fmt.Printf("%-40v%-40v%-40v\n", name, on, off)
+		on := ""
+		off := ""
+		if a.RVon == 0 {
+			on = "On: N/A"
+		} else {
+			on = "On: " + fmt.Sprintf("%d", a.RVon) + "% for " + wantdb[a.BestOn].Char
+		}
+		if a.RVoff == 0 {
+			off = "Off: N/A"
+		} else {
+			off = "Off: " + fmt.Sprintf("%d", a.RVoff) + "% for " + wantdb[a.BestOff].Char
+		}
+		//fmt.Printf("%v", a)
+		fmt.Printf(" %-60v%-40v%-40v\n", name, on, off)
 	}
 }
 
 func artiname(a Artifact) string {
 	name := a.Set
-	name += "+" + strconv.Itoa(a.Level) + slotKey[a.Slot][:1]
+	name += "+" + strconv.Itoa(a.Level) + strings.ToUpper(slotKey[a.Slot][:1])
 	if a.Slot >= 2 {
 		name += meStats[a.Mainstat]
 	}
@@ -123,9 +148,10 @@ func artiname(a Artifact) string {
 			} else {
 				first = false
 			}
-			name += strings.Replace(meStats[i], "f", "", 1) + fmt.Sprintf("%0.1f", s*float64(ispct[i]))
 			if ispct[i] == 100 {
-				name += "%"
+				name += meStats[i] + fmt.Sprintf("%0.1f", s*float64(ispct[i])) + "%"
+			} else {
+				name += strings.Replace(meStats[i], "f", "", 1) + fmt.Sprintf("%0.0f", s*float64(ispct[i]))
 			}
 		}
 	}
@@ -156,7 +182,7 @@ func readArtifacts() {
 	artisection := "[" + rawgood[strings.Index(rawgood, "artifacts\"")+12:strings.Index(rawgood, "weapons\"")-2]
 
 	var gartis []GOarti
-	err = json.Unmarshal([]byte(artisection), &artis)
+	err = json.Unmarshal([]byte(artisection), &gartis)
 	//asnowman := subsubs(ar)
 	for i := range gartis { //this currently works by looking for an arti with 3 stats = and 1 stat bigger (main stat), should be good enough?
 		var art Artifact
@@ -167,10 +193,10 @@ func readArtifacts() {
 		art.Rarity = gartis[i].Rarity
 		art.Slot = getSlotID(gartis[i].SlotKey)
 		art.Substats = newsubs()
-		art.BestOn = -1
-		art.BestOff = -1
-		art.RVon = -1
-		art.RVoff = -1
+		art.BestOn = 0
+		art.BestOff = 0
+		art.RVon = 0
+		art.RVoff = 0
 		for _, s := range gartis[i].Substats {
 			if s.Key == "" {
 				break
@@ -184,18 +210,18 @@ func readArtifacts() {
 
 func evalartis() {
 	for i, w := range wantdb {
-		for _, a := range artis {
+		for j, a := range artis {
 			rv := maxrv(a, w) + currv(a, w)
 			on := isOn(a, w)
 			if on {
 				if rv > a.RVon {
-					a.RVon = rv
-					a.BestOn = i
+					artis[j].RVon = rv
+					artis[j].BestOn = i
 				}
 			} else {
 				if rv > a.RVoff {
-					a.RVoff = rv
-					a.BestOff = i
+					artis[j].RVoff = rv
+					artis[j].BestOff = i
 				}
 			}
 		}
@@ -217,7 +243,7 @@ func maxrv(a Artifact, w Want) int {
 	if a.Lines == 3 {
 		ptrolls--
 		//choose the best stat not currently on arti
-		w2 := w.Substats
+		w2 := addsubs(newsubs(), w.Substats)
 		for i := range a.Substats {
 			if a.Substats[i] > 0 {
 				w2[i] = 0
@@ -225,7 +251,7 @@ func maxrv(a Artifact, w Want) int {
 		}
 		rv += int(100.0 * maxsub(w2))
 	}
-	w2 := w.Substats
+	w2 := addsubs(newsubs(), w.Substats)
 	if a.Lines == 4 { //if 4 lines, best stat to upgrade might not be the BIS one
 		for i := range a.Substats {
 			if a.Substats[i] == 0 {
@@ -259,19 +285,6 @@ func newsubs() []float64 { //empty stat array
 	return []float64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 }
 
-func AGstatid(key string, ispt bool) int {
-	for i, k := range AGstatKeys {
-		if k == key {
-			if i < 6 && ispt {
-				return i + 1 //the key for flat vs % hp, atk and def is the same, so we have to look at the value
-			}
-			return i
-		}
-	}
-	fmt.Printf("no stat found for the AG key %v", key)
-	return -1
-}
-
 func getStatID(key string) int {
 	for i, k := range statKey {
 		if k == key {
@@ -302,23 +315,9 @@ func getSlotID(key string) int {
 	return -1
 }
 
-//ugly sorting code - sorts sim chars by dps, which is the order we should optimize them in (except this is a waste bc user has to specify anyway rn)
-/*chars := []string{"", "", "", ""}
-chardps := []float64{-1.0, -1.0, -1.0, -1.0}
-for i := range baseline.CharDPS {
-	chardps[i] = baseline.CharDPS[i].DPS1.Mean
-}
-sort.Float64s(chardps)
-for i := range baseline.Characters {
-	for j := range chardps {
-		if baseline.CharDPS[i].DPS1.Mean == chardps[j] {
-			chars[j] = baseline.Characters[i].Name
-		}
-	}
-}*/
-
-var artinames = []string{"BlizzardStrayer", "HeartOfDepth", "ViridescentVenerer", "MaidenBeloved", "TenacityOfTheMillelith", "PaleFlame", "HuskOfOpulentDreams", "OceanHuedClam", "ThunderingFury", "Thundersoother", "EmblemOfSeveredFate", "ShimenawasReminiscence", "NoblesseOblige", "BloodstainedChivalry", "CrimsonWitchOfFlames", "Lavawalker"}
-var artiabbrs = []string{"bs", "hod", "vv", "mb", "tom", "pf", "husk", "ohc", "tf", "ts", "esf", "sr", "no", "bsc", "cw", "lw"}
+var artinames = []string{"BlizzardStrayer", "HeartOfDepth", "ViridescentVenerer", "MaidenBeloved", "TenacityOfTheMillelith", "PaleFlame", "HuskOfOpulentDreams", "OceanHuedClam", "ThunderingFury", "Thundersoother", "EmblemOfSeveredFate", "ShimenawasReminiscence", "NoblesseOblige", "BloodstainedChivalry", "CrimsonWitchOfFlames", "Lavawalker", "GladiatorsFinale",
+	"Berserker", "WanderersTroupe", "TheExile", "Instructor", "VermillionHereafter", "EchoesOfAnOffering", "Gambler", "Scholar"}
+var artiabbrs = []string{"bs", "hod", "vv", "mb", "tom", "pf", "husk", "ohc", "tf", "ts", "esf", "sr", "no", "bsc", "cw", "lw", "gf", "ber", "wt", "exl", "ins", "vh", "eof", "gmb", "sch"}
 
 var simChars = []string{"ganyu", "rosaria", "kokomi", "venti", "ayaka", "mona", "albedo", "fischl", "zhongli", "raiden", "bennett", "xiangling", "xingqiu", "shenhe", "yae", "kazuha", "beidou", "sucrose", "jean", "chongyun", "yanfei", "keqing", "tartaglia", "eula", "lisa", "yunjin"}
 var simCharsID = []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25}
@@ -327,7 +326,6 @@ var GOchars = []string{"Ganyu", "Rosaria", "SangonomiyaKokomi", "Venti", "Kamisa
 var slotKey = []string{"flower", "plume", "sands", "goblet", "circlet"}
 var statKey = []string{"atk", "atk_", "hp", "hp_", "def", "def_", "eleMas", "enerRech_", "critRate_", "critDMG_", "heal_", "pyro_dmg_", "electro_dmg_", "cryo_dmg_", "hydro_dmg_", "anemo_dmg_", "geo_dmg_", "physical_dmg_"}
 var meStats = []string{"atkf", "atk", "hpf", "hp", "deff", "def", "em", "er", "cr", "cd", "heal", "pyro", "electro", "cryo", "hydro", "anemo", "geo", "phys"}
-var AGstatKeys = []string{"Atk", "n/a", "hp", "n/a", "Def", "n/a", "ele_mas", "EnergyRecharge", "CritRate", "CritDMG", "HealingBonus", "pyro", "electro", "cryo", "hydro", "anemo", "geo", "physicalDmgBonus"}
 var ispct = []int{1, 100, 1, 100, 1, 100, 1, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100}
 
 var maxrolls = []float64{19.45, 0.0583, 298.75, 0.0583, 23.15, 0.0729, 23.31, 0.0648, 0.0389, 0.0777, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0}
@@ -366,4 +364,18 @@ var mschance = [][]int{ //chance of mainstat based on arti type
 	{0, 8, 0, 8, 0, 8, 3, 3},
 	{0, 17, 0, 17, 0, 16, 2, 0, 0, 0, 0, 4, 4, 4, 4, 4, 4, 4},
 	{0, 11, 0, 11, 0, 11, 2, 0, 5, 5, 5},
+}
+
+type sortt []Artifact
+
+func (s sortt) Len() int {
+	return len(s)
+}
+
+func (s sortt) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s sortt) Less(i, j int) bool {
+	return s[i].RVoff >= s[j].RVoff
 }

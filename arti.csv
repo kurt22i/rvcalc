@@ -1,21 +1,110 @@
-albedo,totm,def,geo,crit,cr cd def,atk
-albedo,husk,def,geo,crit,cr cd def,atk
+albedo,tom,def,geo,crit,cr cd def,
+albedo,husk,def,geo,crit,cr cd def,
 raiden,tom esf,er atk,electro atk,crit,cr cd atk er,
 xingqiu,no esf,er atk,hydro,crit,cr cd atk er,
-bennett,ins no,er hp,hp,heal,hp er em*,hpf cr cd
-xiangling,esf,er em atk,pyro,crit,cr cd er em atk,
+bennett,ins,er hp,hp,heal,hp er em,hpf cr cd
+xiangling,esf cw,er em atk,pyro,crit,cr cd er em atk,
 shenhe,no,atk er,atk cryo,atk crit,cr cd atk er,
 ayaka,esf,atk er,cryo,crit,cr cd atk er,
-rosaria,no lw esf,em atk,cryo,crit,cr cd er em atk,
+rosaria,lw,em,cryo,crit,cr cd er em atk,
 hu tao,sr cw,em hp,pyro,crit,cr cd em hp,atk
-kazuha,vv,em er,em,em,em er cr,cd atk
-ganyu,bs,atk,cryo,cd,cr cd atk er,
-ayaka,bs,atk,cryo,cd atk,cr cd atk er,
-fischl,tom 2atk 2tf,atk,electro,crit,cr cd atk er,
+kazuha,vv,em er,em,em cr,em er cr,cd atk
+ganyu,bs,atk,cryo,crit,cr cd atk er,
+ayaka,bs,atk,cryo,crit atk,cr cd atk er,
+fischl,tom 2atk tf ts,atk,electro,crit,cr cd atk er,
 sucrose,vv,em er,em,em,em er cr,cd atk
 ayato,hod,atk,hydro,crit,cr cd atk er,
 shenhe,2atk,atk er,atk cryo,atk crit,cr cd atk er,
 kokomi,tom ohc,hp er,hp hydro,hp heal,hp er atk,hpf
 xiao,vh,atk er,atk anemo,atk crit,cr cd atk er,
 shenhe,bs,atk er,atk cryo,atk crit,cr cd atk er,
-bennett,cw,atk,pyro,crit,cr cd atk er em,
+bennett,cw,atk em,pyro,crit,cr cd atk er em,
+aloy,tom no,atk,cryo,crit,cr cd atk er,
+amber,ins,er atk,pyro,crit,cr er,cd atk
+ayato,hod eof no,atk,hydro,crit,cr cd atk er,
+ayato,esf,er,hydro,crit,cr cd atk er,
+ayato,gf,atk,hydro,crit,cr cd atk,
+barbara,ohc,hp,hp,heal,hp er em,hpf
+beidou,esf,atk er,electro,crit,cr cd atk er,
+beidou,2atk no tf,atk,electro,crit,cr cd atk er,
+bennett,tf,em,pyro,crit,cr cd atk em,er
+bennett,no,er hp atk,hp pyro,heal crit,hp er em,hpf cr cd
+jean,vv,em atk er,em atk anemo,em heal cr,er em cr atk,cd
+jean,ohc,atk,anemo atk,heal cr,atk cr cd,
+kazuha,tf,em,em,em,em atk,er cd cr
+venti,lw,atk,anemo,crit,atk cr cd em,
+sayu,vv,atk em er,atk em,atk em,atk em er,cr cd
+sucrose,vv 2atk,atk,anemo,crit,cr cd atk,
+amc,vv,em er,em,em cr,cr em er,atk cd
+venti,vv,em er atk,em anemo,em crit,cr cd atk em er,
+xiao,vv,er,anemo,crit,er cr cd atk,
+chongyun,esf,em,cryo,crit,cr cd atk em,er
+chongyun,no,atk em,cryo,crit,cr cd atk er,
+diona,no tom,er hp,hp,hp cr,cr er hp,hpf
+diona,bs,hp,hp,hp cr,cr er hp,hpf
+bennett,exl,er hp,hp,heal,hp er,hpf
+shenhe,esf,atk,cryo,cr,cr atk er cd,
+eula,pf,atk,phys,crit,cr cd atk er,
+eula,esf,er atk,phys,crit,cr cd atk er,
+ganyu,wt sr,em atk,cryo,crit,em atk cd cr,
+ganyu,no,atk,cryo,crit,er atk cd cr,
+ganyu,esf,atk er,cryo,crit,er atk cd cr,
+kaeya,esf,em atk,cryo,crit,atk cd cr em,
+kaeya,ins,atk,cryo,crit,atk cd cr,
+kaeya,no,atk,cryo,crit,atk cd cr,
+kaeya,bs,atk,cryo,crit,atk cd cr,
+qiqi,ohc,atk er,atk,heal cr,atk cr er,
+rosaria,no esf,em atk er,cryo,crit,cr cd er em atk,
+rosaria,bs,atk,cryo,crit,cr cd atk er,
+fischl,pf,atk,electro,crit,cr cd atk,
+keqing,sr,atk,pyro,crit,cr cd atk em,
+keqing,ts,atk,electro,crit,cr cd atk,
+keqing,sr,atk,electro,crit,cr cd atk,
+lisa,esf,er em,em electro,em cr,em er cr,cd atk
+lisa,ins,er,em electro,em,em er cr atk cd,
+lisa,no,er,electro,crit,atk cr cd er,
+razor,pf,atk,phys,crit,atk cr cd,er
+sara,tom no esf,er atk,electro,crit,atk cr cd er,
+sara,ins,atk em,electro,crit,atk cr cd em,
+emc,no,er,electro,crit,atk cr cd er,
+yae,tom,em atk,electro,crit,atk em cr cd er,
+yae,2atk tf,atk,electro,crit,atk cr cd em er,
+yae,ins,er em,electro,crit,em er,atk cr cd
+yae,esf,em atk,electro,crit,em atk cd cr,er
+yae,ts,atk,electro,crit,em atk cd cr,er
+gorou,no,er def,def geo,cr,cr def er,cd atk
+gorou,exl,er def,def geo,cr,cr def er,cd atk
+gorou,ohc,def,def,def,def,deff cr cd atk
+gorou,esf,er def,def geo,cr,cr def er,atk
+itto,husk,def,geo,crit,cr cd def er,
+ningguang,ap 2atk,atk,geo,crit,cr cd atk,er
+ningguang,ins,atk,geo,crit,cd cr atk,
+noelle,husk,def,geo,crit,cd cr def,er
+gmc,no ap 2atk,atk,geo,cr,cr cd atk,
+yun jin,husk,def er,def,def cr,er cr def,
+yun jin,ap,er def,def,def cr,cr er def,
+yun jin,no,def er,def,def cr,cr er def,
+yun jin,eof,atk,phys,crit,cr cd atk,
+zhongli,tom ap no,hp,hp,hp,cr hp,hpf
+zhongli,ins,hp,hp,hp cr,cr hp,hpf
+zhongli,ap tom no,atk hp,geo,crit,cr cd hp atk,
+zhongli,pf,atk,phys,crit,cr cd atk,
+mona,tom no,er hp,hp,heal,hp er,hpf
+mona,tom no,atk,hydro,crit,cr cd er atk,
+mona,no tom,er,hydro,crit,cr er,cd atk
+childe,hod,atk,hydro,crit,cr cd atk,er
+childe,no,atk,hydro,crit,cr cd atk,
+childe,bs,atk,hydro,crit,cr cd atk,
+xingqiu,bs,atk,hydro,crit,cr cd atk,er
+diluc,cw tf,em,pyro,crit,cr cd atk em,er
+klee,lw,atk er,pyro,crit,cr cd atk er,
+klee,esf cw,atk,pyro,crit,cr cd atk er,
+thoma,esf,hp er,hp,hp cr,cr hp er,
+yanfei,cw,em atk,pyro,crit,cr cd atk em,
+yanfei,ins,em,pyro,crit,cr cd atk em,
+yanfei,lw,atk,pyro,crit,cr cd atk,
+yanfei,esf,er,hp,hp cr,cr hp er,
+yanfei,no,er,hp,hp cr,cr hp er,
+yanfei,sr,atk,pyro,crit,cr cd atk,
+yoimiya,sr lw,atk,pyro,crit,cr cd atk,
+yoimiya,sr cw,em atk,pyro,crit,cr cd atk em,
