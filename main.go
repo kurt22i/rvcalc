@@ -82,17 +82,23 @@ type Want struct {
 }
 
 type Artifact struct {
-	Set      string
-	Substats []float64
-	Lines    int
-	Mainstat int
-	Level    int
-	Slot     int
-	BestOn   int
-	RVon     int
-	BestOff  int
-	RVoff    int
-	Rarity   int
+	Set          string
+	Substats     []float64
+	Lines        int
+	Mainstat     int
+	Level        int
+	Slot         int
+	BestOn       int
+	RVon         int
+	BestOff      int
+	RVoff        int
+	Rarity       int
+	currv        int
+	curon        bool
+	bestrank     int
+	bestrankid   int
+	bestrankison bool
+	meetseria    bool
 }
 
 func getSetID(dom string) int { //returns the internal id for an artifact
@@ -118,6 +124,7 @@ func printResults() {
 		name := artiname(a) + ":"
 		on := ""
 		off := ""
+		rank := ""
 		if a.RVon == 0 {
 			on = "On: N/A"
 		} else {
@@ -128,8 +135,17 @@ func printResults() {
 		} else {
 			off = "Off: " + fmt.Sprintf("%d", a.RVoff) + "% for " + wantdb[a.BestOff].Char
 		}
+		if a.bestrank == 1000 {
+			rank = "Best Rank: N/A"
+		} else {
+			onoff := "off"
+			if a.bestrankison {
+				onoff = "on"
+			}
+			rank = "Best Rank: #" + fmt.Sprintf("%d", a.bestrank) + " " + onoff + "-piece for " + wantdb[a.bestrankid].Char
+		}
 		//fmt.Printf("%v", a)
-		fmt.Printf(" %-60v%-40v%-40v\n", name, on, off)
+		fmt.Printf(" %-60v%-40v%-40v%-40v\n", name, on, off, rank)
 	}
 }
 
@@ -197,6 +213,12 @@ func readArtifacts() {
 		art.BestOff = 0
 		art.RVon = 0
 		art.RVoff = 0
+		art.currv = -1
+		art.curon = false
+		art.bestrank = 1000
+		art.bestrankid = -1
+		art.bestrankison = false
+		art.meetseria = false
 		for _, s := range gartis[i].Substats {
 			if s.Key == "" {
 				break
@@ -224,8 +246,76 @@ func evalartis() {
 					artis[j].BestOff = i
 				}
 			}
+			artis[j].currv = rv
+			artis[j].curon = on
+		}
+		rank(w, i)
+	}
+}
+
+func rank(w Want, id int) {
+
+	//on
+	for i := 0; i < 5; i++ {
+		for j := range w.Set {
+			for k := range w.Mainstats[i] {
+				if w.Mainstats[i][k] > 0 {
+					setMeetseria(true, i, w.Set[j], k)
+					for l := range artis {
+						if artis[l].meetseria {
+							r := calcRank(l)
+							if r < artis[l].bestrank {
+								artis[l].bestrank = r
+								artis[l].bestrankid = id
+								artis[l].bestrankison = true
+							}
+						}
+					}
+				}
+			}
 		}
 	}
+
+	//off
+	for i := 0; i < 5; i++ {
+		for k := range w.Mainstats[i] {
+			if w.Mainstats[i][k] > 0 {
+				setMeetseria(false, i, "any", k)
+				for l := range artis {
+					if artis[l].meetseria {
+						r := calcRank(l)
+						if r < artis[l].bestrank {
+							artis[l].bestrank = r
+							artis[l].bestrankid = id
+							artis[l].bestrankison = false
+						}
+					}
+				}
+			}
+		}
+
+	}
+}
+
+func setMeetseria(on bool, slot int, set string, ms int) {
+	for i := range artis {
+		artis[i].meetseria = true
+		if slot != artis[i].Slot {
+			artis[i].meetseria = false
+		} else if (set != artis[i].Set && set != "any") || ms != artis[i].Mainstat {
+			artis[i].meetseria = false
+		}
+	}
+}
+
+func calcRank(id int) int {
+	r := 1
+	for i := range artis {
+		if artis[i].meetseria && artis[i].currv > artis[id].currv {
+			r++
+		}
+	}
+	return r
 }
 
 func isOn(a Artifact, w Want) bool {
