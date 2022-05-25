@@ -11,14 +11,14 @@ import (
 )
 
 var godatafile = "GOdata.txt" //filename of the GO data that will be used for weapons, current artifacts, and optimization settings besides ER. When go adds ability to optimize for x*output1 + y*output2, the reference sim will be used to determine optimization target.
-var wantfile = "kqmarti2.csv"
+var wantfile = "arti.csv"
 var artis []Artifact
 var wantdb []Want
 var allcompete bool
 var allcompetem bool
 
 func main() {
-	flag.BoolVar(&allcompete, "ac", false, "all sets on a line compete")
+	flag.BoolVar(&allcompete, "ac", false, "true = all sets on a single line in the want file compete for rank")
 	flag.BoolVar(&allcompetem, "acm", false, "all mainstats on a line compete")
 	flag.Parse()
 
