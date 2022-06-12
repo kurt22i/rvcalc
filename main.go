@@ -11,7 +11,7 @@ import (
 )
 
 var godatafile = "GOdata.txt" //filename of the GO data that will be used for weapons, current artifacts, and optimization settings besides ER. When go adds ability to optimize for x*output1 + y*output2, the reference sim will be used to determine optimization target.
-var wantfile = "arti.csv"
+var wantfile = "kqmarti2.csv"
 var artis []Artifact
 var wantdb []Want
 var allcompete bool
