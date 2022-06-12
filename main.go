@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"sort"
@@ -10,13 +11,16 @@ import (
 )
 
 var godatafile = "GOdata.txt" //filename of the GO data that will be used for weapons, current artifacts, and optimization settings besides ER. When go adds ability to optimize for x*output1 + y*output2, the reference sim will be used to determine optimization target.
-var wantfile = "arti.csv"
+var wantfile = "kqmarti2.csv"
 var artis []Artifact
 var wantdb []Want
+var allcompete bool
+var allcompetem bool
 
 func main() {
-	//flag.IntVar(&simspertest, "i", 10000, "sim iterations per test")
-	//flag.Parse()
+	flag.BoolVar(&allcompete, "ac", false, "true = all sets on a single line in the want file compete for rank")
+	flag.BoolVar(&allcompetem, "acm", false, "all mainstats on a line compete")
+	flag.Parse()
 
 	readArtifacts()
 	readWant()
@@ -32,9 +36,19 @@ func readWant() {
 	}
 	rawwant := string(f)
 	wants := strings.Split(rawwant, "\n")
+	var vals []float64
 	for i := range wants {
+		wants[i] = strings.Replace(wants[i], "\r", "", -1)
 		data := strings.Split(wants[i], ",")
 		if len(data) <= 1 {
+			continue
+		}
+		if i == 0 {
+			valstr := data[5:]
+			for j := range valstr {
+				fl, _ := strconv.ParseFloat(valstr[j], 64)
+				vals = append(vals, fl)
+			}
 			continue
 		}
 		var w Want
@@ -47,10 +61,14 @@ func readWant() {
 				w.Set = append(w.Set, sets[j])
 			}
 		}
-		data[6] = strings.Replace(data[6], "\r", "", 1) //remove weird \r char
+		data[len(data)-1] = strings.Replace(data[len(data)-1], "\r", "", 1) //remove weird \r char
 		w.Mainstats = [][]float64{makestats("hpf", 1.0), makestats("atkf", 1.0), makestats(data[2], 1.0), makestats(data[3], 1.0), makestats(data[4], 1.0)}
-		w.Substats = addsubs(newsubs(), makestats(data[5], 1.0))
-		w.Substats = addsubs(w.Substats, makestats(data[6], 0.5))
+		//w.Substats = addsubs(newsubs(), makestats(data[5], 1.0))
+		//w.Substats = addsubs(w.Substats, makestats(data[6], 0.5))
+		w.Substats = newsubs()
+		for j := range vals {
+			w.Substats = addsubs(w.Substats, makestats(data[5+j], vals[j]))
+		}
 
 		//fmt.Printf("%v\n", w)
 		wantdb = append(wantdb, w)
@@ -82,17 +100,23 @@ type Want struct {
 }
 
 type Artifact struct {
-	Set      string
-	Substats []float64
-	Lines    int
-	Mainstat int
-	Level    int
-	Slot     int
-	BestOn   int
-	RVon     int
-	BestOff  int
-	RVoff    int
-	Rarity   int
+	Set          string
+	Substats     []float64
+	Lines        int
+	Mainstat     int
+	Level        int
+	Slot         int
+	BestOn       int
+	RVon         int
+	BestOff      int
+	RVoff        int
+	Rarity       int
+	currv        int
+	curon        bool
+	bestrank     int
+	bestrankid   int
+	bestrankison bool
+	meetseria    bool
 }
 
 func getSetID(dom string) int { //returns the internal id for an artifact
@@ -118,6 +142,7 @@ func printResults() {
 		name := artiname(a) + ":"
 		on := ""
 		off := ""
+		rank := ""
 		if a.RVon == 0 {
 			on = "On: N/A"
 		} else {
@@ -128,8 +153,17 @@ func printResults() {
 		} else {
 			off = "Off: " + fmt.Sprintf("%d", a.RVoff) + "% for " + wantdb[a.BestOff].Char
 		}
+		if a.bestrank == 1000 {
+			rank = "Best Rank: N/A"
+		} else {
+			onoff := "off"
+			if a.bestrankison {
+				onoff = "on"
+			}
+			rank = "Best Rank: #" + fmt.Sprintf("%d", a.bestrank) + " " + onoff + "-piece for " + wantdb[a.bestrankid].Char
+		}
 		//fmt.Printf("%v", a)
-		fmt.Printf(" %-60v%-40v%-40v\n", name, on, off)
+		fmt.Printf(" %-60v%-40v%-40v%-40v\n", name, on, off, rank)
 	}
 }
 
@@ -197,6 +231,12 @@ func readArtifacts() {
 		art.BestOff = 0
 		art.RVon = 0
 		art.RVoff = 0
+		art.currv = -1
+		art.curon = false
+		art.bestrank = 1000
+		art.bestrankid = -1
+		art.bestrankison = false
+		art.meetseria = false
 		for _, s := range gartis[i].Substats {
 			if s.Key == "" {
 				break
@@ -224,8 +264,101 @@ func evalartis() {
 					artis[j].BestOff = i
 				}
 			}
+			artis[j].currv = rv
+			artis[j].curon = on
+		}
+		rank(w, i)
+	}
+}
+
+func rank(w Want, id int) {
+
+	//on
+	for i := 0; i < 5; i++ {
+		for j := range w.Set {
+			for k := range w.Mainstats[i] {
+				if w.Mainstats[i][k] > 0 {
+					setMeetseria(true, i, w.Set[j], k)
+					if allcompetem {
+						setMeetseria2(true, i, w.Set[j], w.Mainstats[i])
+					}
+					for l := range artis {
+						if artis[l].meetseria {
+							r := calcRank(l)
+							if r < artis[l].bestrank {
+								artis[l].bestrank = r
+								artis[l].bestrankid = id
+								artis[l].bestrankison = true
+							}
+						}
+					}
+				}
+			}
 		}
 	}
+
+	//off
+	for i := 0; i < 5; i++ {
+		for k := range w.Mainstats[i] {
+			if w.Mainstats[i][k] > 0 {
+				setMeetseria(false, i, "any", k)
+				if allcompetem {
+					setMeetseria2(true, i, "any", w.Mainstats[i])
+				}
+				for l := range artis {
+					if artis[l].meetseria {
+						r := calcRank(l)
+						if r < artis[l].bestrank {
+							artis[l].bestrank = r
+							artis[l].bestrankid = id
+							artis[l].bestrankison = false
+						}
+					}
+				}
+			}
+		}
+
+	}
+}
+
+func setMeetseria(on bool, slot int, set string, ms int) {
+	for i := range artis {
+		artis[i].meetseria = true
+		if slot != artis[i].Slot || ms != artis[i].Mainstat {
+			artis[i].meetseria = false
+		} else if allcompete {
+			if on != artis[i].curon && set != "any" {
+				artis[i].meetseria = false
+			}
+		} else if set != artis[i].Set && set != "any" {
+			artis[i].meetseria = false
+		}
+	}
+}
+
+func setMeetseria2(on bool, slot int, set string, ms []float64) {
+	for i := range artis {
+		artis[i].meetseria = true
+		if slot != artis[i].Slot || ms[artis[i].Mainstat] == 0 {
+			artis[i].meetseria = false
+		} else if allcompete {
+			if on != artis[i].curon && set != "any" {
+				artis[i].meetseria = false
+			}
+		} else if set != artis[i].Set && set != "any" {
+			artis[i].meetseria = false
+		}
+	}
+}
+
+func calcRank(id int) int {
+	r := 1
+	for i := range artis {
+		if artis[i].meetseria && artis[i].currv > artis[id].currv {
+			r++
+		}
+	}
+	return r
 }
 
 func isOn(a Artifact, w Want) bool {
